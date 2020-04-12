@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  OrdersAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: Orders API
+      Description: A demo API for Orders
+      Body:
+        openapi: "3.0.1"
+        info:
+          title: "SNS Service Proxy"
+          version: "2020-04-10T17:21:01Z"
+        paths:
+          /orders:
+            post:
+              responses:
+                "200":
+                  description: "200 response"
+                  content:
+                    application/json:
+                      schema:
+                        $ref: "#/components/schemas/Empty"
+              x-amazon-apigateway-integration:
+                credentials: !GetAtt APIGWRole.Arn
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:sns:path//" 
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseTemplates:
+                      application/json: "{\"body\": \"Order received.\"}"
+                requestParameters:
+                  integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+                requestTemplates:
+                  application/json: !Join [ "", [
+                    "Action=Publish&TopicArn=$util.urlEncode('",
+                    !Ref OrdersTopic,
+                    "')&Message=$util.urlEncode($input.body)" ] ] 
+                passthroughBehavior: "never"
+                httpMethod: "POST"
+                type: "aws"
+        components:
+          schemas:
+            Empty:
+              title: "Empty Schema"
+              type: "object"
+
+  OrdersTopic:
+    Type: AWS::SNS::Topic
+
+  OrderServiceQueue:
+    Type: AWS::SQS::Queue
+    
+  OrdersQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref OrderServiceQueue
+      PolicyDocument:
+        Statement:
+          Effect: Allow
+          Principal: "*"
+          Action: "sqs:*"
+          Resource: "*"
+          Condition:
+            ArnEquals:
+              "aws:SourceArn": !Ref OrdersTopic
+          
+    
+  InputQueueToSnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt OrderServiceQueue.Arn
+      Protocol: sqs
+      RawMessageDelivery: false
+      TopicArn: !Ref OrdersTopic
+
+  APIGWRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: SNSPublish
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "sns:*"
+                Resource: !Ref OrdersTopic
+        
+          

@@ -1,0 +1,1 @@
+aws apigateway create-deployment --rest-api-id tztstixfwj --stage-name stg --description 'Deployed from CLI'
