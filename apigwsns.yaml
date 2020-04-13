@@ -3,7 +3,7 @@ Resources:
   OrdersAPI:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: Orders API
+      Name: OrdersAPI
       Description: A demo API for Orders
       Body:
         openapi: "3.0.1"
@@ -65,7 +65,6 @@ Resources:
             ArnEquals:
               "aws:SourceArn": !Ref OrdersTopic
           
-    
   InputQueueToSnsSubscription:
     Type: AWS::SNS::Subscription
     Properties:
@@ -96,4 +95,15 @@ Resources:
                 Action: "sns:*"
                 Resource: !Ref OrdersTopic
         
-          
+  ProdDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+        RestApiId: !Ref OrdersAPI
+        StageName: prod        
+
+Outputs:
+  APIDomainNameWithStage:
+    Value: !Sub 'https://${OrdersAPI}.execute-api.${AWS::Region}.amazonaws.com/prod'
+
+  QueueURL: 
+    Value: !Ref OrderServiceQueue
